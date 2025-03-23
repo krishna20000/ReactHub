@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN;
 
 const GithubSearch = () => {
   const [username, setUsername] = useState('krishna20000');
@@ -8,19 +9,31 @@ const GithubSearch = () => {
   const [error, setError] = useState(null);
 
   const fetchGithubData = useCallback(async () => {
-    if (!username) return;
+    if (!username.trim()) return;
     setLoading(true);
     setError(null);
 
     try {
-      const userResponse = await fetch(`https://api.github.com/users/${username}`);
-      if (!userResponse.ok) throw new Error('User not found');
+      const headers = GITHUB_TOKEN ? { Authorization: `token ${GITHUB_TOKEN}` } : {};
+
+      const userResponse = await fetch(`https://api.github.com/users/${username}`, { headers });
+      
+      if (userResponse.status === 404) throw new Error('❌ User not found. Please check the username.');
+      if (userResponse.status === 403) throw new Error('⚠️ API rate limit exceeded. Try again later.');
+      if (!userResponse.ok) throw new Error('❗ Something went wrong. Please try again.');
+
       const userData = await userResponse.json();
       setUserData(userData);
 
-      const reposResponse = await fetch(userData.repos_url);
-      const reposData = await reposResponse.json();
-      setRepos(reposData);
+      // Fetch Repositories Only If repos_url is Valid
+      if (userData.repos_url) {
+        const reposResponse = await fetch(userData.repos_url, { headers });
+        const reposData = await reposResponse.json();
+        setRepos(reposData);
+      } else {
+        setRepos([]);
+      }
+
     } catch (err) {
       setError(err.message);
       setUserData(null);
@@ -40,7 +53,7 @@ const GithubSearch = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white px-4">
       <div className="p-6 bg-gray-800 rounded-lg shadow-lg w-full max-w-4xl">
-        <h2 className="text-2xl font-bold text-center mb-6 text-blue-400">GitHub User Search</h2>
+        <h2 className="text-2xl font-bold text-center mb-6 text-blue-400">🔎 GitHub User Search</h2>
 
         {/* Input Field */}
         <div className="flex items-center space-x-2">
@@ -87,21 +100,25 @@ const GithubSearch = () => {
 
             {/* Right Side: Repositories */}
             <div className="flex-1">
-              <h4 className="text-lg font-semibold text-blue-300 mb-3">Repositories:</h4>
+              <h4 className="text-lg font-semibold text-blue-300 mb-3">📂 Repositories:</h4>
               <div className="grid grid-cols-2 gap-4">
-                {repos.slice(0, 6).map((repo) => (
-                  <div key={repo.id} className="bg-gray-700 p-4 rounded-lg shadow-md">
-                    <a
-                      href={repo.html_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-400 font-semibold hover:underline"
-                    >
-                      {repo.name}
-                    </a>
-                    <p className="text-sm text-gray-400 mt-1">{repo.description || 'No description available'}</p>
-                  </div>
-                ))}
+                {repos.length > 0 ? (
+                  repos.slice(0, 6).map((repo) => (
+                    <div key={repo.id} className="bg-gray-700 p-4 rounded-lg shadow-md">
+                      <a
+                        href={repo.html_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 font-semibold hover:underline"
+                      >
+                        {repo.name}
+                      </a>
+                      <p className="text-sm text-gray-400 mt-1">{repo.description}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-400">No repositories found.</p>
+                )}
               </div>
             </div>
           </div>
@@ -112,7 +129,3 @@ const GithubSearch = () => {
 };
 
 export default GithubSearch;
-
-
-
-
